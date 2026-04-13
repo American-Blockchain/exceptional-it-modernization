@@ -3,7 +3,7 @@ fastapi
 uvicorn[standard]
 
 # 2. Agent Frameworks
-agent-lightning          # The APO and Tracing engine
+agentlightning @ git+https://github.com/microsoft/agent-lightning.git 
 semantic-kernel          # Included for native payload parsing/types
 google-genai             # The modern Google Agent SDK (or google-cloud-aiplatform)
 
@@ -12,3 +12,7 @@ opentelemetry-api
 opentelemetry-sdk
 opentelemetry-instrumentation-fastapi
 azure-monitor-opentelemetry # To route Python traces directly to App Insights
+
+# 4. Agent UI Integration
+copilotkit
+langchain # Standard protocol support for agent interaction

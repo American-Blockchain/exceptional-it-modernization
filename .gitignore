@@ -1,0 +1,67 @@
+# Local Environment / System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.vscode/
+.zshrc
+
+# AI Agent Context & Configurations
+.gemini/
+.antigravity/
+
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+*.tfvars.json
+out.tfplan
+.terraformrc
+terraform.rc
+# Do NOT ignore .terraform.lock.hcl - it should be committed
+
+# Visual Studio / C# Orchestrator
+src/csharp-orchestrator/bin/
+src/csharp-orchestrator/obj/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+*.userprefs
+
+# Python Specialist
+__pycache__/
+*.py[cod]
+*$py.class
+src/python-specialist/.venv/
+src/python-specialist/venv/
+src/python-specialist/env/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+
+# Node.js / React (AG-UI Client)
+node_modules/
+src/ag-ui-client/node_modules/
+.npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+.next/
+src/ag-ui-client/.next/
+out/
+build/
+dist/
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.vercel/
