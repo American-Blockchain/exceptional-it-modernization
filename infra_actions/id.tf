@@ -40,6 +40,15 @@ resource "azurerm_federated_identity_credential" "github_oidc" {
   subject             = var.github_subject
 }
 
+resource "azurerm_federated_identity_credential" "github_oidc_bass" {
+  name                = "github-actions-bass-branch"
+  resource_group_name = data.azurerm_resource_group.rg.name
+  audience            = ["api://AzureADTokenExchange"]
+  issuer              = "https://token.actions.githubusercontent.com"
+  parent_id           = azurerm_user_assigned_identity.github_actions_identity.id
+  subject             = "repo:American-Blockchain/exceptional-it-modernization:ref:refs/heads/bass"
+}
+
 # Output these values; you will need them for your GitHub Actions Variables
 output "AZURE_CLIENT_ID" { value = azurerm_user_assigned_identity.github_actions_identity.client_id }
 output "AZURE_TENANT_ID" { value = data.azurerm_client_config.current.tenant_id }

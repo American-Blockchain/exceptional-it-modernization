@@ -116,7 +116,7 @@ resource "azurerm_container_app" "python_specialist" {
       }
       env {
         name  = "OTEL_RESOURCE_ATTRIBUTES"
-        value = "service.namespace=ai-foundry-mas"
+        value = "service.namespace=ai-foundry-mas,service.instance.id=${CONTAINER_APP_REPLICA_NAME}"
       }
       env {
         name  = "AZURE_OPENAI_ENDPOINT"
@@ -184,11 +184,11 @@ resource "azurerm_container_app" "csharp_orchestrator" {
       }
       env {
         name  = "OTEL_RESOURCE_ATTRIBUTES"
-        value = "service.namespace=ai-foundry-mas"
+        value = "service.namespace=ai-foundry-mas,service.instance.id=${CONTAINER_APP_REPLICA_NAME}"
       }
       env {
         name  = "PYTHON_AGENT_INTERNAL_URL"
-        value = "https://${azurerm_container_app.python_specialist.ingress[0].fqdn}"
+        value = "http://${azurerm_container_app.python_specialist.ingress[0].fqdn}"
       }
       env {
         name  = "AZURE_OPENAI_ENDPOINT"
@@ -209,7 +209,7 @@ resource "azurerm_container_app" "csharp_orchestrator" {
   ingress {
     allow_insecure_connections = false
     external_enabled           = true # Public facing
-    target_port                = 8080
+    target_port                = 80
     traffic_weight {
       percentage      = 100
       latest_revision = true
