@@ -25,3 +25,47 @@ variable "github_subject" {
   }
   default = "repo:American-Blockchain/exceptional-it-modernization:ref:refs/heads/main"
 }
+
+variable "resource_group_name" {
+  type        = string
+  description = "The name of the Resource Group."
+  default     = "rg-terraform-state"
+}
+
+variable "shared_prefix" {
+  type        = string
+  description = "Prefix for shared resources."
+  default     = "ai-foundry-mas"
+}
+
+variable "ca_python_name" {
+  type        = string
+  description = "The name of the Python Specialist Container App."
+  default     = "ca-python-specialist"
+}
+
+variable "ca_csharp_name" {
+  type        = string
+  description = "The name of the C# Orchestrator Container App."
+  default     = "ca-csharp-orchestrator"
+}
+
+variable "teacher_model_name" {
+  type        = string
+  default     = "o1-preview"
+}
+
+variable "teacher_model_version" {
+  type        = string
+  default     = "2024-09-12" # o1-preview version
+}
+
+variable "student_model_name" {
+  type        = string
+  default     = "gpt-4o-mini"
+}
+
+variable "student_model_version" {
+  type        = string
+  default     = "2024-08-06" # Updated from 2024-07-18 to avoid deprecation
+}

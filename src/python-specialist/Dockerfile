@@ -1,22 +1,33 @@
-# Use the slim Python 3.11 base image
-FROM python:3.11-slim
+# Stage 1: Builder
+FROM python:3.11-slim AS builder
 
-# 1. Inject the 'uv' binary directly from Astral's official builder image
-# This is drastically faster than running 'pip install uv'
+# Inject uv binary for high-speed dependency resolution
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-# 2. Copy dependencies first to leverage Docker layer caching
+# Enable bytecode compilation for faster cold starts
+ENV UV_COMPILE_BYTECODE=1
+
+# Use requirements.txt for now as per current project structure,
+# but utilize cache mounts to speed up iterative builds.
 COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system --no-cache-dir -r requirements.txt
 
-# 3. Utilize 'uv pip install' to resolve and install packages.
-# The '--system' flag is critical because Docker containers do not require virtual environments.
-# The '--no-cache' flag ensures the image remains small by dropping downloaded wheels.
-RUN uv pip install --system --no-cache -r requirements.txt
+# Stage 2: Runtime
+# Using the same base image to ensure library compatibility
+FROM python:3.11-slim
 
-# 4. Copy the agent logic
+WORKDIR /app
+
+# Copy the installed site-packages from the builder stage.
+# This keeps the final image lean and excludes the uv binary.
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy agent logic
 COPY . .
 
-# 5. Boot the ASGI server
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# Execution: 3 workers is a safer middle ground for 2.0 vCPUs to avoid contention.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "3"]

@@ -1,14 +1,23 @@
 data "azurerm_client_config" "current" {}
 
+# ---------------------------------------------------------
+# Self-Healing Provider Registrations
+# ---------------------------------------------------------
+resource "azurerm_resource_provider_registration" "app" {
+  name = "Microsoft.App"
+}
+
+
+
 data "azurerm_resource_group" "rg" {
-  name = "rg-terraform-state" # Update to match your actual RG name
+  name = var.resource_group_name
 }
 
 # ---------------------------------------------------------
 # Observability (OpenTelemetry Backbone)
 # ---------------------------------------------------------
 resource "azurerm_log_analytics_workspace" "law" {
-  name                = "law-ai-foundry-mas"
+  name                = "law-${var.shared_prefix}"
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = data.azurerm_resource_group.rg.name
   sku                 = "PerGB2018"
@@ -16,7 +25,7 @@ resource "azurerm_log_analytics_workspace" "law" {
 }
 
 resource "azurerm_application_insights" "app_insights" {
-  name                = "appi-ai-foundry-mas"
+  name                = "appi-${var.shared_prefix}"
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = data.azurerm_resource_group.rg.name
   workspace_id        = azurerm_log_analytics_workspace.law.id
@@ -27,7 +36,7 @@ resource "azurerm_application_insights" "app_insights" {
 # Azure AI Foundry (Teacher & Student Models)
 # ---------------------------------------------------------
 resource "azurerm_cognitive_account" "ai_foundry" {
-  name                  = "cog-ai-foundry-mas"
+  name                  = "cog-${var.shared_prefix}"
   location              = data.azurerm_resource_group.rg.location
   resource_group_name   = data.azurerm_resource_group.rg.name
   kind                  = "OpenAI"
@@ -36,32 +45,38 @@ resource "azurerm_cognitive_account" "ai_foundry" {
 }
 
 resource "azurerm_cognitive_deployment" "teacher_model" {
-  name                 = "gpt-4o"
+  name                 = "teacher-model"
   cognitive_account_id = azurerm_cognitive_account.ai_foundry.id
   model {
     format  = "OpenAI"
-    name    = "gpt-4o"
-    version = "2024-05-13"
+    name    = var.teacher_model_name
+    version = var.teacher_model_version
   }
-  scale { type = "Standard" }
+  sku {
+    name     = "Standard"
+    capacity = 10
+  }
 }
 
 resource "azurerm_cognitive_deployment" "student_model" {
-  name                 = "gpt-4o-mini"
+  name                 = "student-model"
   cognitive_account_id = azurerm_cognitive_account.ai_foundry.id
   model {
     format  = "OpenAI"
-    name    = "gpt-4o-mini"
-    version = "2024-07-18"
+    name    = var.student_model_name
+    version = var.student_model_version
   }
-  scale { type = "Standard" }
+  sku {
+    name     = "Standard"
+    capacity = 10
+  }
 }
 
 # ---------------------------------------------------------
 # Compute Layer & Container Apps
 # ---------------------------------------------------------
 resource "azurerm_container_app_environment" "mas_env" {
-  name                       = "cae-ai-foundry-mas"
+  name                       = "cae-${var.shared_prefix}"
   location                   = data.azurerm_resource_group.rg.location
   resource_group_name        = data.azurerm_resource_group.rg.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.law.id
@@ -69,7 +84,7 @@ resource "azurerm_container_app_environment" "mas_env" {
 
 # --- Python Specialist Agent ---
 resource "azurerm_container_app" "python_specialist" {
-  name                         = "ca-python-specialist"
+  name                         = var.ca_python_name
   container_app_environment_id = azurerm_container_app_environment.mas_env.id
   resource_group_name          = data.azurerm_resource_group.rg.name
   revision_mode                = "Single"
@@ -138,7 +153,7 @@ resource "azurerm_role_assignment" "python_acr_pull" {
 
 # --- C# Semantic Kernel Orchestrator ---
 resource "azurerm_container_app" "csharp_orchestrator" {
-  name                         = "ca-csharp-orchestrator"
+  name                         = var.ca_csharp_name
   container_app_environment_id = azurerm_container_app_environment.mas_env.id
   resource_group_name          = data.azurerm_resource_group.rg.name
   revision_mode                = "Single"
