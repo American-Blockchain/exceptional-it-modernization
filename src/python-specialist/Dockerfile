@@ -9,8 +9,10 @@ WORKDIR /app
 # Enable bytecode compilation for faster cold starts
 ENV UV_COMPILE_BYTECODE=1
 
+# Install git and ca-certificates for uv to pull git-based dependencies
+RUN apt-get update && apt-get install -y git ca-certificates && rm -rf /var/lib/apt/lists/*
+
 # Use requirements.txt for now as per current project structure,
-# but utilize cache mounts to speed up iterative builds.
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system --no-cache-dir -r requirements.txt

@@ -3,7 +3,7 @@ fastapi
 uvicorn[standard]
 
 # 2. Agent Frameworks
-agentlightning @ git+https://github.com/microsoft/agent-lightning.git 
+agentlightning             # Stable release from PyPI as per Microsoft fallback guidelines
 semantic-kernel          # Included for native payload parsing/types
 google-genai             # The modern Google Agent SDK (or google-cloud-aiplatform)
 
