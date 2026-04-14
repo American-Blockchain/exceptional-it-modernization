@@ -52,20 +52,20 @@ variable "ca_csharp_name" {
 
 variable "teacher_model_name" {
   type        = string
-  default     = "o1-preview"
+  default     = "gpt-5"
 }
 
 variable "teacher_model_version" {
   type        = string
-  default     = "2024-09-12" # o1-preview version
+  default     = "2025-08-07" # GA per az cognitiveservices query
 }
 
 variable "student_model_name" {
   type        = string
-  default     = "gpt-4o-mini"
+  default     = "gpt-4.1-mini"
 }
 
 variable "student_model_version" {
   type        = string
-  default     = "2024-08-06" # Updated from 2024-07-18 to avoid deprecation
+  default     = "2025-04-14" # GA per az cognitiveservices query
 }

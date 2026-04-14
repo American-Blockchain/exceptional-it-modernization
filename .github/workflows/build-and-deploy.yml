@@ -14,10 +14,11 @@ permissions:
   contents: read
 
 env:
-  ACR_NAME: ${{ vars.ACR_NAME }} 
-  RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }} 
-  CA_PYTHON_NAME: ${{ vars.CA_PYTHON_NAME }}
-  CA_CSHARP_NAME: ${{ vars.CA_CSHARP_NAME }}
+  # Fallbacks align exactly with infra_actions/variables.tf defaults
+  ACR_NAME: ${{ vars.ACR_NAME || 'primeagentacr' }}
+  RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-terraform-state' }}
+  CA_PYTHON_NAME: ${{ vars.CA_PYTHON_NAME || 'ca-python-specialist' }}
+  CA_CSHARP_NAME: ${{ vars.CA_CSHARP_NAME || 'ca-csharp-orchestrator' }}
 
 jobs:
   build-and-push:

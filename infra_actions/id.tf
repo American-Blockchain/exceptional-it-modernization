@@ -21,6 +21,19 @@ resource "azurerm_user_assigned_identity" "github_actions_identity" {
   location            = data.azurerm_resource_group.rg.location
 }
 
+# New: Dedicated Identity for Container Apps to pull from ACR (Eliminates SystemAssigned race conditions)
+resource "azurerm_user_assigned_identity" "ca_acr_pull_identity" {
+  name                = "id-ca-acr-pull"
+  resource_group_name = data.azurerm_resource_group.rg.name
+  location            = data.azurerm_resource_group.rg.location
+}
+
+resource "azurerm_role_assignment" "ca_acr_pull" {
+  principal_id         = azurerm_user_assigned_identity.ca_acr_pull_identity.principal_id
+  role_definition_name = "AcrPull"
+  scope                = azurerm_container_registry.acr.id
+}
+
 # 3. Grant the Identity "AcrPush" rights to the Registry
 resource "azurerm_role_assignment" "acr_push" {
   principal_id         = azurerm_user_assigned_identity.github_actions_identity.principal_id

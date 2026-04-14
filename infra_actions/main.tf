@@ -53,8 +53,7 @@ resource "azurerm_cognitive_deployment" "teacher_model" {
     version = var.teacher_model_version
   }
   sku {
-    name     = "Standard"
-    capacity = 10
+    name = "GlobalStandard"
   }
 }
 
@@ -67,8 +66,7 @@ resource "azurerm_cognitive_deployment" "student_model" {
     version = var.student_model_version
   }
   sku {
-    name     = "Standard"
-    capacity = 10
+    name = "GlobalStandard"
   }
 }
 
@@ -90,12 +88,13 @@ resource "azurerm_container_app" "python_specialist" {
   revision_mode                = "Single"
 
   identity {
-    type = "SystemAssigned"
+    type         = "SystemAssigned, UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.ca_acr_pull_identity.id]
   }
 
   registry {
     server   = azurerm_container_registry.acr.login_server
-    identity = "system"
+    identity = azurerm_user_assigned_identity.ca_acr_pull_identity.id
   }
 
   template {
@@ -116,7 +115,7 @@ resource "azurerm_container_app" "python_specialist" {
       }
       env {
         name  = "OTEL_RESOURCE_ATTRIBUTES"
-        value = "service.namespace=ai-foundry-mas,service.instance.id=${CONTAINER_APP_REPLICA_NAME}"
+        value = "service.namespace=ai-foundry-mas,service.instance.id=$${CONTAINER_APP_REPLICA_NAME}"
       }
       env {
         name  = "AZURE_OPENAI_ENDPOINT"
@@ -145,11 +144,7 @@ resource "azurerm_container_app" "python_specialist" {
   }
 }
 
-resource "azurerm_role_assignment" "python_acr_pull" {
-  principal_id         = azurerm_container_app.python_specialist.identity[0].principal_id
-  role_definition_name = "AcrPull"
-  scope                = azurerm_container_registry.acr.id
-}
+# Role assignment for python specialist moved to UserAssigned identity in id.tf
 
 # --- C# Semantic Kernel Orchestrator ---
 resource "azurerm_container_app" "csharp_orchestrator" {
@@ -159,12 +154,13 @@ resource "azurerm_container_app" "csharp_orchestrator" {
   revision_mode                = "Single"
 
   identity {
-    type = "SystemAssigned"
+    type         = "SystemAssigned, UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.ca_acr_pull_identity.id]
   }
 
   registry {
     server   = azurerm_container_registry.acr.login_server
-    identity = "system"
+    identity = azurerm_user_assigned_identity.ca_acr_pull_identity.id
   }
 
   template {
@@ -184,7 +180,7 @@ resource "azurerm_container_app" "csharp_orchestrator" {
       }
       env {
         name  = "OTEL_RESOURCE_ATTRIBUTES"
-        value = "service.namespace=ai-foundry-mas,service.instance.id=${CONTAINER_APP_REPLICA_NAME}"
+        value = "service.namespace=ai-foundry-mas,service.instance.id=$${CONTAINER_APP_REPLICA_NAME}"
       }
       env {
         name  = "PYTHON_AGENT_INTERNAL_URL"
@@ -193,6 +189,10 @@ resource "azurerm_container_app" "csharp_orchestrator" {
       env {
         name  = "AZURE_OPENAI_ENDPOINT"
         value = azurerm_cognitive_account.ai_foundry.endpoint
+      }
+      env {
+        name  = "AZURE_OPENAI_DEPLOYMENT_NAME"
+        value = azurerm_cognitive_deployment.teacher_model.name
       }
     }
 
@@ -217,8 +217,4 @@ resource "azurerm_container_app" "csharp_orchestrator" {
   }
 }
 
-resource "azurerm_role_assignment" "csharp_acr_pull" {
-  principal_id         = azurerm_container_app.csharp_orchestrator.identity[0].principal_id
-  role_definition_name = "AcrPull"
-  scope                = azurerm_container_registry.acr.id
-}
+# Role assignment for orchestrator moved to UserAssigned identity in id.tf

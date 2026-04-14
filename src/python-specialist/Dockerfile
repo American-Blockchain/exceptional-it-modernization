@@ -1,5 +1,4 @@
-# Stage 1: Builder
-FROM python:3.11-slim AS builder
+FROM mcr.microsoft.com/mirror/docker/library/python:3.11-slim AS builder
 
 # Inject uv binary for high-speed dependency resolution
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
@@ -14,12 +13,10 @@ RUN apt-get update && apt-get install -y git ca-certificates && rm -rf /var/lib/
 
 # Use requirements.txt for now as per current project structure,
 COPY requirements.txt .
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system --no-cache-dir -r requirements.txt
+RUN uv pip install --system --no-cache-dir -r requirements.txt
 
 # Stage 2: Runtime
-# Using the same base image to ensure library compatibility
-FROM python:3.11-slim
+FROM mcr.microsoft.com/mirror/docker/library/python:3.11-slim
 
 WORKDIR /app
 

@@ -4,6 +4,8 @@ using Azure.Monitor.OpenTelemetry.AspNetCore;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Azure.Identity;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -50,6 +52,20 @@ builder.Services.AddHttpClient<GoogleAgentPlugin>(client =>
 builder.Services.AddKeyedScoped<Kernel>("AgentKernel", (sp, key) => 
 {
     var kernelBuilder = Kernel.CreateBuilder();
+    
+    // Elite DevOps: Wire the Teacher Brain using Managed Identity
+    var endpoint = builder.Configuration["AZURE_OPENAI_ENDPOINT"];
+    var deployment = builder.Configuration["AZURE_OPENAI_DEPLOYMENT_NAME"];
+    
+    if (!string.IsNullOrEmpty(endpoint) && !string.IsNullOrEmpty(deployment))
+    {
+        kernelBuilder.AddAzureOpenAIChatCompletion(
+            deploymentName: deployment,
+            endpoint: endpoint,
+            credentials: new DefaultAzureCredential()
+        );
+    }
+    
     // Wire the plugin that carries the managed HttpClient from DI
     kernelBuilder.Plugins.AddFromObject(sp.GetRequiredService<GoogleAgentPlugin>());
     return kernelBuilder.Build();
