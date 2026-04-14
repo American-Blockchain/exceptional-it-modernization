@@ -6,11 +6,11 @@ on:
       - main
       - bass
     paths:
-      - 'src/**'
+      - "src/**"
   workflow_dispatch:
 
 permissions:
-  id-token: write 
+  id-token: write
   contents: read
 
 env:
@@ -62,18 +62,24 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy Python Specialist
-        uses: azure/container-apps-deploy-action@v1
+      - name: Deploy Python Specialist via CLI
+        uses: azure/cli@v2
         with:
-          acrName: ${{ env.ACR_NAME }}
-          resourceGroup: ${{ env.RESOURCE_GROUP }}
-          containerAppName: ${{ env.CA_PYTHON_NAME }}
-          imageToDeploy: ${{ env.ACR_NAME }}.azurecr.io/python-specialist:${{ github.sha }}
+          azcliversion: latest
+          inlineScript: |
+            az containerapp update \
+              --name ca-python-specialist \
+              --resource-group rg-terraform-state \
+              --image primeagentacr.azurecr.io/python-specialist:${{ github.sha }} \
+              --no-wait
 
-      - name: Deploy C# Orchestrator
-        uses: azure/container-apps-deploy-action@v1
+      - name: Deploy C# Orchestrator via CLI
+        uses: azure/cli@v2
         with:
-          acrName: ${{ env.ACR_NAME }}
-          resourceGroup: ${{ env.RESOURCE_GROUP }}
-          containerAppName: ${{ env.CA_CSHARP_NAME }}
-          imageToDeploy: ${{ env.ACR_NAME }}.azurecr.io/csharp-orchestrator:${{ github.sha }}
+          azcliversion: latest
+          inlineScript: |
+            az containerapp update \
+              --name ${{ env.CA_CSHARP_NAME }} \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --image ${{ env.ACR_NAME }}.azurecr.io/csharp-orchestrator:${{ github.sha }} \
+              --no-wait
