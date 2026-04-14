@@ -8,22 +8,44 @@ WORKDIR /app
 # Enable bytecode compilation for faster cold starts
 ENV UV_COMPILE_BYTECODE=1
 
-# Install git and ca-certificates for uv to pull git-based dependencies
-RUN apt-get update && apt-get install -y git ca-certificates && rm -rf /var/lib/apt/lists/*
+# Install git, ca-certificates, curl, and Node.js (for Agent Lightning dashboard build)
+RUN apt-get update && \
+    apt-get install -y git ca-certificates curl build-essential && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
 
-# Use requirements.txt for now as per current project structure,
+# Clone Microsoft Agent Lightning from GitHub (building from source per Gemini.MD)
+RUN git clone https://github.com/microsoft/agent-lightning.git /tmp/agent-lightning
+
+# Build the Agent Lightning dashboard (Vite)
+WORKDIR /tmp/agent-lightning/dashboard
+RUN npm ci && npm run build
+
+# The dashboard artifacts are generated at /tmp/agent-lightning/agentlightning/dashboard
+# Move them to our app directory
+WORKDIR /app
+RUN mv /tmp/agent-lightning/agentlightning/dashboard /app/agentlightning_dashboard
+
+# Install standard dependencies
 COPY requirements.txt .
 RUN uv pip install --system --no-cache-dir -r requirements.txt
 
-# Stage 2: Runtime
+# Install Agent Lightning from source with APO support
+RUN uv pip install --system --no-cache-dir /tmp/agent-lightning[apo]
+
+
+# ─── Stage 2: Runtime ──────────────────────────────────────────────────────────
 FROM mcr.microsoft.com/mirror/docker/library/python:3.11-slim
 
 WORKDIR /app
 
-# Copy the installed site-packages from the builder stage.
-# This keeps the final image lean and excludes the uv binary.
+# Copy the installed site-packages from the builder stage
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy the built Agent Lightning dashboard
+COPY --from=builder /app/agentlightning_dashboard /app/agentlightning_dashboard
 
 # Copy agent logic
 COPY . .

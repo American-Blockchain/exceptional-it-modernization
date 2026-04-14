@@ -3,7 +3,7 @@ fastapi
 uvicorn[standard]
 
 # 2. Agent Frameworks
-agentlightning[apo]       # Microsoft Agent Lightning with APO (Automated Prompt Optimization)
+# agentlightning will be built from source in Dockerfile for dashboard support
 semantic-kernel            # Included for native payload parsing/types
 google-genai               # The modern Google Agent SDK
 
