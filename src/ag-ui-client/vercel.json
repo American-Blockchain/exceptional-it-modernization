@@ -1,7 +1,6 @@
 {
   "framework": "nextjs",
-  "buildCommand": "pnpm install && next build",
-  "installCommand": "npm install -g pnpm && pnpm install",
+  "buildCommand": "next build",
   "devCommand": "next dev",
   "public": false
 }
