@@ -40,14 +40,14 @@ if (string.IsNullOrWhiteSpace(pythonAgentUrl))
     throw new InvalidOperationException("Environment Configuration Error: PYTHON_AGENT_INTERNAL_URL must be provided.");
 }
 
-var sbConnectionString = builder.Configuration["SERVICEBUS_CONNECTION_STRING"];
-if (string.IsNullOrWhiteSpace(sbConnectionString))
+var servicebusFqdn = builder.Configuration["SERVICEBUS_FQDN"];
+if (string.IsNullOrWhiteSpace(servicebusFqdn))
 {
-    throw new InvalidOperationException("Environment Configuration Error: SERVICEBUS_CONNECTION_STRING must be provided.");
+    throw new InvalidOperationException("Environment Configuration Error: SERVICEBUS_FQDN must be provided.");
 }
 
-// Register the ServiceBusClient cleanly for DI
-builder.Services.AddSingleton(new ServiceBusClient(sbConnectionString));
+// Register the ServiceBusClient cleanly for DI using passwordless Identity
+builder.Services.AddSingleton(new ServiceBusClient(servicebusFqdn, new DefaultAzureCredential()));
 builder.Services.AddTransient<GoogleAgentPlugin>();
 
 // --- 3. Semantic Kernel Orchestration Layer ---
