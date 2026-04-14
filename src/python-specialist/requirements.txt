@@ -3,16 +3,20 @@ fastapi
 uvicorn[standard]
 
 # 2. Agent Frameworks
-agentlightning             # Stable release from PyPI as per Microsoft fallback guidelines
-semantic-kernel          # Included for native payload parsing/types
-google-genai             # The modern Google Agent SDK (or google-cloud-aiplatform)
+agentlightning[apo]       # Microsoft Agent Lightning with APO (Automated Prompt Optimization)
+semantic-kernel            # Included for native payload parsing/types
+google-genai               # The modern Google Agent SDK
 
-# 3. Observability (Crucial for the ACA OpenTelemetry setup)
+# 3. LangGraph & LangChain (CopilotKit Remote Protocol)
+langgraph
+langchain-openai
+
+# 4. Observability (Crucial for the ACA OpenTelemetry setup)
 opentelemetry-api
 opentelemetry-sdk
 opentelemetry-instrumentation-fastapi
 azure-monitor-opentelemetry # To route Python traces directly to App Insights
 
-# 4. Agent UI Integration
+# 5. Agent UI Integration
 copilotkit
 langchain # Standard protocol support for agent interaction
