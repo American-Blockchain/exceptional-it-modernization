@@ -22,5 +22,6 @@ azure-monitor-opentelemetry # To route Python traces directly to App Insights
 copilotkit
 langchain # Standard protocol support for agent interaction
 
-# 6. Asynchronous Messaging (Enterprise Decoupling)
+# 6. Asynchronous Messaging & Auth (Enterprise Decoupling)
 azure-servicebus # For long-running Agent Lightning APO task pulling
+azure-identity   # For passwordless Azure OpenAI & Azure Service Bus auth
