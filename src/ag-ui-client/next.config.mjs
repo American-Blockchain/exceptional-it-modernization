@@ -6,6 +6,10 @@ const nextConfig = {
   async rewrites() {
     return [
       {
+        source: '/api/copilotkit',
+        destination: `${process.env.PYTHON_AGENT_URL || 'http://localhost:8000'}/copilotkit`,
+      },
+      {
         source: '/api/copilotkit/:path*',
         destination: `${process.env.PYTHON_AGENT_URL || 'http://localhost:8000'}/copilotkit/:path*`,
       },
