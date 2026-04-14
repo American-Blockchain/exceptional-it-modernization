@@ -87,6 +87,9 @@ jobs:
   deploy-frontend:
     needs: deploy
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./src/ag-ui-client
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
