@@ -14,16 +14,20 @@ export default function AgentCommandCenter() {
 
   // Dynamically calculate total tokens consumed across the entire MAS session
   const totalTokens = useMemo(() => {
-    let tokens = 0;
-    visibleMessages.forEach((msg: any) => {
-      if (typeof msg.content === "string") {
-        const match = msg.content.match(/Tokens Consumed: (\d+)/);
-        if (match) {
-          tokens += parseInt(match[1], 10);
-        }
-      }
-    });
-    return tokens;
+    // PROTECT AGAINST SSR BUILD CRASH: Return 0 if undefined
+    if (!visibleMessages) return 0;
+
+    return visibleMessages
+      .filter((m: any) => m.role === "system")
+      .map((m: any) => {
+        // Safely extract the string whether CopilotKit is using .content or .text
+        const contentStr = typeof m.content === "string" ? m.content : 
+                           typeof m.text === "string" ? m.text : "";
+                           
+        const match = contentStr.match(/Tokens Consumed:\s*(\d+)/);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .reduce((acc, curr) => acc + curr, 0);
   }, [visibleMessages]);
 
   return (
@@ -104,22 +108,24 @@ export default function AgentCommandCenter() {
         {/* Right Column: Live Streamed Data */}
         <section className="flex flex-col gap-6 overflow-y-auto pr-2">
           
-          {/* Card: Live APO Critiques from Teacher */}
+          {/* Card: Notable Events Overview */}
           <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-            <h3 className="font-semibold text-foreground mb-4">Teacher APO Critiques</h3>
-            <div className="space-y-4">
-              {visibleMessages
-                .filter((m: any) => typeof m.content === "string" && m.content.includes("APO Critique"))
-                .reverse()
-                .map((msg: any, i: number) => (
-                  <div key={i} className="text-sm p-3 bg-secondary/30 border border-secondary rounded-lg">
-                    {msg.content}
-                  </div>
-              ))}
-              {visibleMessages.length === 0 && (
+            <h3 className="font-semibold text-foreground mb-4">Notable Events Overview</h3>
+            <ul className="space-y-4">
+              {/* PROTECT AGAINST SSR BUILD CRASH: Fallback to empty array */}
+              {(visibleMessages || []).filter((m: any) => m.role === "system").map((msg: any, i: number) => {
+                const textOutput = msg.content || msg.text || "";
+                return (
+                  <li key={i} className="flex gap-3 text-sm">
+                    <span className="text-blue-500 font-bold whitespace-nowrap">Agent Event</span>
+                    <span className="text-muted-foreground">{textOutput}</span>
+                  </li>
+                );
+              })}
+              {(visibleMessages || []).filter((m: any) => m.role === "system").length === 0 && (
                 <span className="text-muted-foreground text-sm italic">Awaiting rollout triggers...</span>
               )}
-            </div>
+            </ul>
           </div>
         </section>
       </main>
