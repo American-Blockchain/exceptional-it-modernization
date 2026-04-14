@@ -87,47 +87,26 @@ jobs:
   deploy-frontend:
     needs: deploy
     runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Fetch C# Orchestrator FQDN
-        id: fetch-fqdn
-        run: |
-          CSHARP_FQDN=$(az containerapp show \
-            --name ${{ env.CA_CSHARP_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --query properties.configuration.ingress.fqdn \
-            --output tsv)
-          echo "PYTHON_AGENT_URL=https://$CSHARP_FQDN" >> $GITHUB_ENV
-
       - name: Install pnpm & Vercel CLI
-        run: |
-          npm install -g pnpm
-          npm install --global vercel@latest
+        run: npm install -g pnpm vercel@latest
 
-      - name: Pull Vercel Environment Information
-        run: vercel pull --yes --environment=production --cwd src/ag-ui-client --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Pull Vercel Environment
+        # Running from repo root. Vercel automatically maps to src/ag-ui-client.
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
           
       - name: Build Project Artifacts
-        run: vercel build --prod --cwd src/ag-ui-client --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
         env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          PYTHON_AGENT_URL: ${{ env.PYTHON_AGENT_URL }}
+          # Injects the C# Gateway URL explicitly during the Next.js build
+          PYTHON_AGENT_URL: "https://${{ env.CA_CSHARP_NAME }}.ashytree-d52b6189.eastus.azurecontainerapps.io"
 
       - name: Deploy Project Artifacts to Vercel
-        run: vercel deploy --prebuilt --prod --cwd src/ag-ui-client --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
