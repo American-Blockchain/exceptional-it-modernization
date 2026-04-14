@@ -3,8 +3,5 @@
   "buildCommand": "pnpm install && next build",
   "installCommand": "npm install -g pnpm && pnpm install",
   "devCommand": "next dev",
-  "public": false,
-  "env": {
-    "PYTHON_AGENT_URL": "@python_agent_url"
-  }
+  "public": false
 }
