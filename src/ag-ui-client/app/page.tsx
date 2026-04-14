@@ -15,7 +15,7 @@ export default function AgentCommandCenter() {
   // Dynamically calculate total tokens consumed across the entire MAS session
   const totalTokens = useMemo(() => {
     let tokens = 0;
-    visibleMessages.forEach((msg) => {
+    visibleMessages.forEach((msg: any) => {
       if (typeof msg.content === "string") {
         const match = msg.content.match(/Tokens Consumed: (\d+)/);
         if (match) {
@@ -109,9 +109,9 @@ export default function AgentCommandCenter() {
             <h3 className="font-semibold text-foreground mb-4">Teacher APO Critiques</h3>
             <div className="space-y-4">
               {visibleMessages
-                .filter((m) => typeof m.content === "string" && m.content.includes("APO Critique"))
+                .filter((m: any) => typeof m.content === "string" && m.content.includes("APO Critique"))
                 .reverse()
-                .map((msg, i) => (
+                .map((msg: any, i: number) => (
                   <div key={i} className="text-sm p-3 bg-secondary/30 border border-secondary rounded-lg">
                     {msg.content}
                   </div>
