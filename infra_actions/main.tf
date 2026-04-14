@@ -122,8 +122,8 @@ resource "azurerm_container_app" "python_specialist" {
         value = azurerm_cognitive_account.ai_foundry.endpoint
       }
       env {
-        name  = "SERVICEBUS_CONNECTION_STRING"
-        value = azurerm_servicebus_namespace.sb.default_primary_connection_string
+        name  = "SERVICEBUS_FQDN"
+        value = "${azurerm_servicebus_namespace.mas_bus.name}.servicebus.windows.net"
       }
     }
 
@@ -199,8 +199,8 @@ resource "azurerm_container_app" "csharp_orchestrator" {
         value = azurerm_cognitive_deployment.teacher_model.name
       }
       env {
-        name  = "SERVICEBUS_CONNECTION_STRING"
-        value = azurerm_servicebus_namespace.sb.default_primary_connection_string
+        name  = "SERVICEBUS_FQDN"
+        value = "${azurerm_servicebus_namespace.mas_bus.name}.servicebus.windows.net"
       }
     }
 
@@ -226,9 +226,9 @@ resource "azurerm_container_app" "csharp_orchestrator" {
 }
 
 # ---------------------------------------------------------
-# Enterprise Messaging (Azure Service Bus)
+# Asynchronous Messaging Layer (Azure Service Bus)
 # ---------------------------------------------------------
-resource "azurerm_servicebus_namespace" "sb" {
+resource "azurerm_servicebus_namespace" "mas_bus" {
   name                = "sb-${var.shared_prefix}"
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = data.azurerm_resource_group.rg.name
@@ -237,21 +237,19 @@ resource "azurerm_servicebus_namespace" "sb" {
 
 resource "azurerm_servicebus_queue" "apo_tasks" {
   name         = "apo-tasks-queue"
-  namespace_id = azurerm_servicebus_namespace.sb.id
-  
-  partitioning_enabled = true
+  namespace_id = azurerm_servicebus_namespace.mas_bus.id
 }
 
-# C# Orchestrator acts as Sender, Python Specialist acts as Receiver.
-# Since both share the ca_acr_pull_identity, we grant both roles to it.
-resource "azurerm_role_assignment" "sb_sender" {
-  scope                = azurerm_servicebus_namespace.sb.id
+# --- RBAC: Grant C# Orchestrator Sender Rights ---
+resource "azurerm_role_assignment" "csharp_sb_sender" {
+  principal_id         = azurerm_user_assigned_identity.ca_acr_pull_identity.principal_id
   role_definition_name = "Azure Service Bus Data Sender"
-  principal_id         = azurerm_user_assigned_identity.ca_acr_pull_identity.principal_id
+  scope                = azurerm_servicebus_namespace.mas_bus.id
 }
 
-resource "azurerm_role_assignment" "sb_receiver" {
-  scope                = azurerm_servicebus_namespace.sb.id
-  role_definition_name = "Azure Service Bus Data Receiver"
+# --- RBAC: Grant Python Specialist Receiver Rights ---
+resource "azurerm_role_assignment" "python_sb_receiver" {
   principal_id         = azurerm_user_assigned_identity.ca_acr_pull_identity.principal_id
+  role_definition_name = "Azure Service Bus Data Receiver"
+  scope                = azurerm_servicebus_namespace.mas_bus.id
 }
