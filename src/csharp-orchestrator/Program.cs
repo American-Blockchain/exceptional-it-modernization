@@ -85,8 +85,14 @@ builder.Services.AddReverseProxy()
             {
                 RouteId = "copilotkit-stream",
                 ClusterId = "python-specialist-cluster",
-                // Catch all CopilotKit routes (SSE, WebSockets, standard POSTs)
-                Match = new RouteMatch { Path = "/copilotkit/{**catch-all}" } 
+                Match = new RouteMatch { Path = "/copilotkit/{**catch-all}" },
+                
+                // CRITICAL FIX: Force the HttpClient to use the Python internal FQDN 
+                // for the Host header instead of passing the public C# Gateway header.
+                Transforms = new[]
+                {
+                    new Dictionary<string, string> { { "RequestHeaderOriginalHost", "false" } }
+                }
             }
         },
         clusters: new[]

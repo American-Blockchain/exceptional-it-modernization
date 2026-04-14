@@ -19,8 +19,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${inter.className} bg-background text-foreground`}>
-        {/* Added the 'agent' prop and a trailing slash to guarantee routing */}
-        <CopilotKit runtimeUrl="/api/copilotkit/" agent="mas_orchestrator">
+        {/* Removed trailing slash to prevent FastAPI 307 payload drops */}
+        <CopilotKit runtimeUrl="/api/copilotkit" agent="mas_orchestrator">
           {children}
         </CopilotKit>
       </body>
