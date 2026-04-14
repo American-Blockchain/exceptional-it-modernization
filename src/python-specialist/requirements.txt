@@ -1,6 +1,7 @@
 # 1. Web & Concurrency
 fastapi
 uvicorn[standard]
+orjson
 
 # 2. Agent Frameworks
 # agentlightning will be built from source in Dockerfile for dashboard support
@@ -20,3 +21,6 @@ azure-monitor-opentelemetry # To route Python traces directly to App Insights
 # 5. Agent UI Integration
 copilotkit
 langchain # Standard protocol support for agent interaction
+
+# 6. Asynchronous Messaging (Enterprise Decoupling)
+azure-servicebus # For long-running Agent Lightning APO task pulling

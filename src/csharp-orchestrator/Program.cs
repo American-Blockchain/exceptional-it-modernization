@@ -7,6 +7,7 @@ using OpenTelemetry.Trace;
 using Azure.Identity;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Yarp.ReverseProxy.Configuration;
+using Azure.Messaging.ServiceBus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,12 +40,15 @@ if (string.IsNullOrWhiteSpace(pythonAgentUrl))
     throw new InvalidOperationException("Environment Configuration Error: PYTHON_AGENT_INTERNAL_URL must be provided.");
 }
 
-builder.Services.AddHttpClient<GoogleAgentPlugin>(client =>
+var sbConnectionString = builder.Configuration["SERVICEBUS_CONNECTION_STRING"];
+if (string.IsNullOrWhiteSpace(sbConnectionString))
 {
-    client.BaseAddress = new Uri(pythonAgentUrl);
-    client.DefaultRequestHeaders.Add("User-Agent", "SK-Orchestrator-Elite-DevOps");
-    client.Timeout = TimeSpan.FromSeconds(60); 
-});
+    throw new InvalidOperationException("Environment Configuration Error: SERVICEBUS_CONNECTION_STRING must be provided.");
+}
+
+// Register the ServiceBusClient cleanly for DI
+builder.Services.AddSingleton(new ServiceBusClient(sbConnectionString));
+builder.Services.AddTransient<GoogleAgentPlugin>();
 
 // --- 3. Semantic Kernel Orchestration Layer ---
 // Note: AddHttpClient<GoogleAgentPlugin> above already registers the plugin as Transient.

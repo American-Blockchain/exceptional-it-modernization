@@ -1,24 +1,24 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Net.Http;
-using System.Text;
 using System.Text.Json;
 using Microsoft.SemanticKernel;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Context.Propagation;
 using Orchestrator.Models;
+using Azure.Messaging.ServiceBus;
 
 namespace Orchestrator.Plugins;
 
 public class GoogleAgentPlugin
 {
-    private readonly HttpClient _httpClient;
+    private readonly ServiceBusClient _serviceBusClient;
     private readonly ILogger<GoogleAgentPlugin> _logger;
+    private const string QueueName = "apo-tasks-queue";
 
-    public GoogleAgentPlugin(HttpClient httpClient, ILogger<GoogleAgentPlugin> logger)
+    public GoogleAgentPlugin(ServiceBusClient serviceBusClient, ILogger<GoogleAgentPlugin> logger)
     {
-        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        _serviceBusClient = serviceBusClient ?? throw new ArgumentNullException(nameof(serviceBusClient));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -34,7 +34,7 @@ public class GoogleAgentPlugin
         var activity = Activity.Current;
         var traceId = activity?.TraceId.ToHexString() ?? Guid.NewGuid().ToString("N");
         
-        _logger.LogInformation("[Elite-DevOps] Initiating specialist task delegation. TraceId: {TraceId}, Intent: {Intent}", traceId, intent);
+        _logger.LogInformation("[Elite-DevOps] Initiating async specialist task delegation via Service Bus. TraceId: {TraceId}, Intent: {Intent}", traceId, intent);
 
         var payload = new SpecialistPayload(
             TaskId: traceId,
@@ -50,19 +50,20 @@ public class GoogleAgentPlugin
         );
 
         var jsonContent = JsonSerializer.Serialize(payload);
+        var message = new ServiceBusMessage(jsonContent)
+        {
+            MessageId = traceId,
+            ContentType = "application/json"
+        };
         
-        // Use a relative path; the base address is mandated via DI in Program.cs
-        using var request = new HttpRequestMessage(HttpMethod.Post, "execute");
-        request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-
-        // Explicitly inject the W3C Trace Context into the HTTP Request headers
+        // Explicitly inject the W3C Trace Context into the Service Bus Message application properties
         if (activity != null)
         {
-            _logger.LogDebug("[OTel] Resuming trace context from Activity.Current. Injecting W3C headers.");
+            _logger.LogDebug("[OTel] Resuming trace context from Activity.Current. Injecting W3C properties into Service Bus message.");
             Propagators.DefaultTextMapPropagator.Inject(
                 new PropagationContext(activity.Context, Baggage.Current), 
-                request, 
-                (req, key, value) => req.Headers.TryAddWithoutValidation(key, value));
+                message, 
+                (msg, key, value) => msg.ApplicationProperties.Add(key, value));
         }
         else
         {
@@ -71,15 +72,15 @@ public class GoogleAgentPlugin
 
         try 
         {
-            var response = await _httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
+            await using var sender = _serviceBusClient.CreateSender(QueueName);
+            await sender.SendMessageAsync(message);
             
-            _logger.LogInformation("[Elite-DevOps] Specialist task returned successfully. TraceId: {TraceId}", traceId);
-            return await response.Content.ReadAsStringAsync();
+            _logger.LogInformation("[Elite-DevOps] Specialist task successfully queued via Service Bus. TraceId: {TraceId}", traceId);
+            return $"Task queued successfully. TraceId: {traceId}. Awaiting Python Specialist offline resolution.";
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex)
         {
-            _logger.LogCritical(ex, "[A2A-Error] Failed to communicate with Python Specialist agent. BaseAddress: {BaseAddress}, TraceId: {TraceId}", _httpClient.BaseAddress, traceId);
+            _logger.LogCritical(ex, "[A2A-Error] Failed to communicate with Service Bus Queue {QueueName}. TraceId: {TraceId}", QueueName, traceId);
             throw;
         }
     }

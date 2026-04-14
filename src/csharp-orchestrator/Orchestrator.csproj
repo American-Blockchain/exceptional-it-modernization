@@ -6,6 +6,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
     <UserSecretsId>dotnet-Orchestrator-Elite-DevOps</UserSecretsId>
+
+    <!-- Enforce Server GC for the 2.0 vCPU allocation -->
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    
+    <!-- Ensure Tiered PGO is strictly enabled -->
+    <TieredPGO>true</TieredPGO>
+    
+    <!-- Optimize for container execution -->
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +24,7 @@
     <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.2.0" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.8.1" />
     <PackageReference Include="Yarp.ReverseProxy" Version="2.1.0" />
+    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.17.4" />
   </ItemGroup>
 
 </Project>
