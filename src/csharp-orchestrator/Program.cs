@@ -6,6 +6,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Azure.Identity;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
+using Yarp.ReverseProxy.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -71,8 +72,38 @@ builder.Services.AddKeyedScoped<Kernel>("AgentKernel", (sp, key) =>
     return kernelBuilder.Build();
 });
 
+// --- NEW: YARP Reverse Proxy Configuration ---
+builder.Services.AddReverseProxy()
+    .LoadFromMemory(
+        routes: new[]
+        {
+            new RouteConfig()
+            {
+                RouteId = "copilotkit-stream",
+                ClusterId = "python-specialist-cluster",
+                // Catch all CopilotKit routes (SSE, WebSockets, standard POSTs)
+                Match = new RouteMatch { Path = "/copilotkit/{**catch-all}" } 
+            }
+        },
+        clusters: new[]
+        {
+            new ClusterConfig()
+            {
+                ClusterId = "python-specialist-cluster",
+                Destinations = new Dictionary<string, DestinationConfig>(StringComparer.OrdinalIgnoreCase)
+                {
+                    // Dynamically point to the ACA Envoy internal FQDN
+                    { "python-backend", new DestinationConfig() { Address = pythonAgentUrl } }
+                }
+            }
+        }
+    );
+
 // --- 4. Request Pipeline & Health ---
 var app = builder.Build();
+
+// --- NEW: Map the Proxy Middleware ---
+app.MapReverseProxy();
 
 app.MapGet("/", () => Results.Ok(new { 
     Status = "Healthy", 
