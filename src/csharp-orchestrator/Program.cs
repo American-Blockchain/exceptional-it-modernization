@@ -44,15 +44,15 @@ builder.Services.AddHttpClient<GoogleAgentPlugin>(client =>
 });
 
 // --- 3. Semantic Kernel Orchestration Layer ---
-// Register the plugin as Scoped to ensure it respects the Request/Trace lifecycle
-builder.Services.AddScoped<GoogleAgentPlugin>();
+// Note: AddHttpClient<GoogleAgentPlugin> above already registers the plugin as Transient.
+// Do NOT re-register with AddScoped — it would strip the typed HttpClient factory.
 
 builder.Services.AddKeyedScoped<Kernel>("AgentKernel", (sp, key) => 
 {
-    var kernel = new Kernel(sp);
-    // Bind the plugin that uses our managed HttpClient
-    kernel.Plugins.AddFromObject(sp.GetRequiredService<GoogleAgentPlugin>());
-    return kernel;
+    var kernelBuilder = Kernel.CreateBuilder();
+    // Wire the plugin that carries the managed HttpClient from DI
+    kernelBuilder.Plugins.AddFromObject(sp.GetRequiredService<GoogleAgentPlugin>());
+    return kernelBuilder.Build();
 });
 
 // --- 4. Request Pipeline & Health ---

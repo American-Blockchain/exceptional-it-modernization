@@ -59,7 +59,7 @@ public class GoogleAgentPlugin
         if (activity != null)
         {
             _logger.LogDebug("[OTel] Resuming trace context from Activity.Current. Injecting W3C headers.");
-            Propagators.Default.Inject(
+            Propagators.DefaultTextMapPropagator.Inject(
                 new PropagationContext(activity.Context, Baggage.Current), 
                 request, 
                 (req, key, value) => req.Headers.TryAddWithoutValidation(key, value));

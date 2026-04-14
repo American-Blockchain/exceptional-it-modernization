@@ -53,7 +53,7 @@ async def execute_task(request: Request, payload: SpecialistPayload):
         trace_id = format(span.get_span_context().trace_id, '032x')
         logger.info(f"[Elite-DevOps] Resuming distributed trace: {trace_id}")
 
-        with store.trace(task_id=trace_id) as agent_trace:
+        with store.trace(task_id=payload.task_id) as agent_trace:
             # Teacher's critique/APO feedback would be processed here
             agent_trace.record_state("agent_mission", payload.intent)
             
