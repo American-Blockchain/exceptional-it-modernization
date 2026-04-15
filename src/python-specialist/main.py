@@ -168,7 +168,14 @@ async def lifespan(app: FastAPI):
     yield
     worker_task.cancel()
 
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+from fastapi.staticfiles import StaticFiles
+
 app = FastAPI(lifespan=lifespan, default_response_class=ResilientORJSONResponse, redirect_slashes=False)
+
+# Support X-Forwarded-Host/Proto from the C# Orchestrator gateway
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
 FastAPIInstrumentor.instrument_app(app)
 
 # 1. Mount Agent Lightning Dashboard

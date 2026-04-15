@@ -29,13 +29,27 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const response = await fetch(`${gatewayUrl}/copilotkit`, {
+    // Append trailing slash to avoid internal FastAPI redirects
+    const targetUrl = `${gatewayUrl}${gatewayUrl.endsWith('/') ? '' : '/'}copilotkit/`;
+    
+    const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
         'Content-Type': req.headers.get('Content-Type') || 'application/json',
       },
       body: await req.text(),
+      redirect: 'manual', // We handle redirects manually to prevent internal URL leakage
     });
+
+    // If the upstream tries to redirect us to an internal URL, we stop it here
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('Location');
+      console.warn('[CopilotKit Proxy] Blocked internal redirect to:', location);
+      return new Response(
+        JSON.stringify({ error: 'Upstream redirected to internal URL.', location }),
+        { status: 502, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Stream the SSE response body directly back to the CopilotKit client
     return new Response(response.body, {
