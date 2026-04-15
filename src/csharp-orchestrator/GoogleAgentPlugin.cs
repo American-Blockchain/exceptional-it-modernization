@@ -8,20 +8,34 @@ using Orchestrator.Models;
 
 namespace Orchestrator.Plugins;
 
+/// <summary>
+/// Semantic Kernel plugin that delegates specialized ML tasks to the Python Specialist
+/// via Azure Service Bus using the A2A (Agent2Agent) JSON-RPC 2.0 protocol.
+///
+/// A2A Spec: https://google.github.io/A2A
+/// Method: tasks/send
+/// Transport: Azure Service Bus (apo-tasks-queue)
+/// Tracing: W3C Trace Context injected into ApplicationProperties["Diagnostic-Id"]
+/// </summary>
 public class GoogleAgentPlugin
 {
     private readonly ServiceBusSender _sender;
     private readonly ILogger<GoogleAgentPlugin> _logger;
 
+    private static readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = false  // compact wire format for Service Bus throughput
+    };
+
     public GoogleAgentPlugin(ServiceBusClient serviceBusClient, ILogger<GoogleAgentPlugin> logger)
     {
-        // Target the specific queue we provisioned in Terraform
         _sender = serviceBusClient.CreateSender("apo-tasks-queue");
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     [KernelFunction]
-    [Description("Delegates a specialized, long-running ML task to the Python Google Agent.")]
+    [Description("Delegates a specialized, long-running ML task to the Python Google ADK Agent via the A2A protocol.")]
     public async Task<string> ExecuteSpecialistTaskAsync(
         [Description("The core instruction for the agent")] string intent,
         [Description("The raw input data to process")] string rawInput,
@@ -29,39 +43,38 @@ public class GoogleAgentPlugin
         [Description("Whether to enforce strict execution rules")] bool strictMode = true)
     {
         var activity = Activity.Current;
-        var traceId = activity?.TraceId.ToHexString() ?? Guid.NewGuid().ToString("N");
-        
-        _logger.LogInformation("[Elite-DevOps] Queuing specialist task. TraceId: {TraceId}", traceId);
+        var taskId = activity?.TraceId.ToHexString() ?? Guid.NewGuid().ToString("N");
 
-        var payload = new SpecialistPayload(
-            TaskId: traceId,
-            AgentRole: "general_specialist",
-            Intent: intent,
-            Parameters: new Dictionary<string, object>
-            {
-                { "target_language", targetLanguage },
-                { "strict_mode", strictMode }
-            },
-            Context: new Dictionary<string, string> { { "session_id", "sk_session" } },
-            RawInput: rawInput
-        );
+        _logger.LogInformation(
+            "[SK→ADK] Queuing A2A tasks/send. TaskId: {TaskId} | Intent: {Intent}",
+            taskId, intent);
 
-        var message = new ServiceBusMessage(JsonSerializer.Serialize(payload))
+        // Build the A2A JSON-RPC 2.0 envelope — standard cross-agent payload
+        var userText = $"{intent}\n\nInput: {rawInput}\nLanguage: {targetLanguage}\nStrictMode: {strictMode}";
+        var a2aRequest = A2ARequest.CreateTasksSend(taskId, userText);
+
+        var messageBody = JsonSerializer.Serialize(a2aRequest, _jsonOptions);
+
+        var message = new ServiceBusMessage(messageBody)
         {
-            MessageId = traceId,
-            CorrelationId = traceId,
-            Subject = "APO_Task_Execution"
+            MessageId    = taskId,
+            CorrelationId = taskId,
+            ContentType  = "application/json",
+            Subject      = "A2A/tasks/send"   // human-readable Service Bus label
         };
 
-        // Inject OpenTelemetry Trace Context directly into the Service Bus application properties
+        // Inject W3C Trace Context for distributed OTel waterfall continuity
+        // The Python ADK receiver extracts this via TraceContextTextMapPropagator
         if (activity != null)
         {
-            message.ApplicationProperties["Diagnostic-Id"] = activity.Id;
+            message.ApplicationProperties["Diagnostic-Id"]   = activity.Id;
+            message.ApplicationProperties["A2A-JsonRpc"]     = "2.0";
+            message.ApplicationProperties["A2A-Method"]      = "tasks/send";
         }
 
         await _sender.SendMessageAsync(message);
-        
-        // Return a correlation string so Semantic Kernel knows the task was safely handed off
-        return $"Task successfully queued for Agent Lightning. Tracking ID: {traceId}.";
+
+        _logger.LogInformation("[SK→ADK] A2A task enqueued successfully. TrackingId: {TaskId}", taskId);
+        return $"{{\"status\":\"queued\",\"a2a_task_id\":\"{taskId}\",\"method\":\"tasks/send\"}}";
     }
 }

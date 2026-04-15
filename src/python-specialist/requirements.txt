@@ -5,9 +5,10 @@ uvloop   # C-level asyncio event loop — required for --loop uvloop in Dockerfi
 orjson
 
 # 2. Agent Frameworks
-# agentlightning will be built from source in Dockerfile for dashboard support
-semantic-kernel            # Included for native payload parsing/types
-google-genai               # The modern Google Agent SDK
+# agentlightning built from source in Dockerfile for APO dashboard support
+google-adk                 # Google Agent Development Kit — A2A protocol runtime
+google-genai               # Google Generative AI SDK (used by ADK internally)
+aiofiles                   # Required by FastAPI StaticFiles for async dashboard serving
 
 # 3. LangGraph & LangChain (CopilotKit Remote Protocol)
 langgraph
