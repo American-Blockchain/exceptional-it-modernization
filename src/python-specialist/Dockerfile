@@ -50,5 +50,5 @@ COPY --from=builder /app/agentlightning_dashboard /app/agentlightning_dashboard
 # Copy agent logic
 COPY . .
 
-# Execution: 3 workers is a safer middle ground for 2.0 vCPUs to avoid contention.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "3"]
+# Execution: 3 workers for 2.0 vCPUs; uvloop enforces C-level async I/O for maximum throughput.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "3", "--loop", "uvloop"]

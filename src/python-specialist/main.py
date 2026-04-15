@@ -45,6 +45,16 @@ tracer = trace.get_tracer(__name__)
 store = LightningStore()
 
 # ---------------------------------------------------------
+# Module-level Azure Identity (hoisted for performance)
+# Instantiated once — DefaultAzureCredential caches tokens internally.
+# Re-instantiation per-request causes unnecessary Entra ID round-trips.
+# ---------------------------------------------------------
+_azure_credential = SyncDefaultAzureCredential()
+_token_provider = get_bearer_token_provider(
+    _azure_credential, "https://cognitiveservices.azure.com/.default"
+)
+
+# ---------------------------------------------------------
 # Resilient ORJSON Serializer
 # ---------------------------------------------------------
 class ResilientORJSONResponse(JSONResponse):
@@ -177,36 +187,25 @@ class MASState(TypedDict):
     notable_events: Annotated[List[str], operator.add]
 
 async def student_node(state: MASState):
-    # 1. Generate the Entra ID Bearer Token dynamically
-    token_provider = get_bearer_token_provider(
-        SyncDefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
-    )
-    
-    # 2. Inject it into the LangChain Azure API client
     llm = AzureChatOpenAI(
         azure_endpoint=os.environ.get("AZURE_OPENAI_ENDPOINT"),
-        azure_deployment="student-model", 
+        azure_deployment="student-model",
         api_version="2024-07-18",
-        azure_ad_token_provider=token_provider
+        azure_ad_token_provider=_token_provider  # Module-level, no per-call overhead
     )
-    
     response = await llm.ainvoke(state["messages"])
     tokens = response.usage_metadata.get("total_tokens", 0) if response.usage_metadata else 0
     return {"messages": [response], "notable_events": [f"Student executed task. Tokens Consumed: {tokens}"]}
 
 async def teacher_node(state: MASState):
-    token_provider = get_bearer_token_provider(
-        SyncDefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
-    )
-    
     llm = AzureChatOpenAI(
         azure_endpoint=os.environ.get("AZURE_OPENAI_ENDPOINT"),
-        azure_deployment="teacher-model", 
+        azure_deployment="teacher-model",
         api_version="2024-07-18",
-        azure_ad_token_provider=token_provider
+        azure_ad_token_provider=_token_provider  # Module-level, no per-call overhead
     )
     last_message = state["messages"][-1].content
-    teacher_prompt = [HumanMessage(content=(f"You are the Teacher critic in an APO loop. Evaluate the following output. Output:\n\n{last_message}"))]
+    teacher_prompt = [HumanMessage(content=f"You are the Teacher critic in an APO loop. Evaluate the following output. Output:\n\n{last_message}")]
     teacher_response = await llm.ainvoke(teacher_prompt)
     teacher_tokens = teacher_response.usage_metadata.get("total_tokens", 0) if teacher_response.usage_metadata else 0
     return {"teacher_critiques": [f"APO Critique: {teacher_response.content}"], "notable_events": [f"Teacher evaluated output. Tokens Consumed: {teacher_tokens}"]}

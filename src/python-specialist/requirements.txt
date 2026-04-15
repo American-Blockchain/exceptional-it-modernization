@@ -1,6 +1,7 @@
 # 1. Web & Concurrency
 fastapi
 uvicorn[standard]
+uvloop   # C-level asyncio event loop — required for --loop uvloop in Dockerfile CMD
 orjson
 
 # 2. Agent Frameworks
