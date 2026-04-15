@@ -102,6 +102,7 @@ builder.Services.AddReverseProxy()
             new ClusterConfig()
             {
                 ClusterId = "python-specialist-cluster",
+                HttpClient = new HttpClientConfig { DangerousAcceptAnyServerCertificate = true, FollowRedirects = true },
                 Destinations = new Dictionary<string, DestinationConfig>(StringComparer.OrdinalIgnoreCase)
                 {
                     { "python-backend", new DestinationConfig() { Address = pythonAgentUrl } }
