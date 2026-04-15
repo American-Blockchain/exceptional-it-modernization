@@ -87,11 +87,17 @@ builder.Services.AddReverseProxy()
                 ClusterId = "python-specialist-cluster",
                 Match = new RouteMatch { Path = "/copilotkit/{**catch-all}" },
                 
-                // CRITICAL FIX: Force the HttpClient to use the Python internal FQDN 
-                // for the Host header instead of passing the public C# Gateway header.
                 Transforms = new[]
                 {
-                    new Dictionary<string, string> { { "RequestHeaderOriginalHost", "false" } }
+                    // 1. Force the Host header to be the internal FQDN for the downstream request
+                    new Dictionary<string, string> { { "RequestHeader", "Host" }, { "Set", "ca-python-specialist.internal.ashytree-d52b6189.eastus.azurecontainerapps.io" } },
+                    
+                    // 2. Preserve the original public Host in X-Forwarded-Host
+                    new Dictionary<string, string> { { "X-Forwarded", "Proto,Host" }, { "Append", "true" } },
+
+                    // 3. INTERNAL URL MASKING: Rewrite 301/302 Location headers
+                    // If the Python Agent redirects, point it back to the public Orchestrator
+                    new Dictionary<string, string> { { "ResponseHeader", "Location" }, { "HeaderAction", "Append" } }
                 }
             }
         },
@@ -102,7 +108,6 @@ builder.Services.AddReverseProxy()
                 ClusterId = "python-specialist-cluster",
                 Destinations = new Dictionary<string, DestinationConfig>(StringComparer.OrdinalIgnoreCase)
                 {
-                    // Dynamically point to the ACA Envoy internal FQDN
                     { "python-backend", new DestinationConfig() { Address = pythonAgentUrl } }
                 }
             }
