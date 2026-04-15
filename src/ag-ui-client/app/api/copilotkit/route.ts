@@ -14,13 +14,18 @@ import { NextRequest } from 'next/server';
  * consumed server-side. The browser only ever sees a clean 200 + SSE stream.
  */
 export async function POST(req: NextRequest) {
-  const gatewayUrl = process.env.PYTHON_AGENT_URL;
-
+  let gatewayUrl = process.env.PYTHON_AGENT_URL;
+  
   if (!gatewayUrl) {
     return new Response(
       JSON.stringify({ error: 'PYTHON_AGENT_URL environment variable is not set.' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
+  }
+
+  // Normalize URL: Ensure protocol is present to avoid fetch parsing errors
+  if (!gatewayUrl.startsWith('http://') && !gatewayUrl.startsWith('https://')) {
+    gatewayUrl = `https://${gatewayUrl}`;
   }
 
   try {
