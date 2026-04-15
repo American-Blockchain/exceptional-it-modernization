@@ -1,29 +1,27 @@
 # 1. Web & Concurrency
 fastapi
 uvicorn[standard]
-uvloop   # C-level asyncio event loop — required for --loop uvloop in Dockerfile CMD
+uvloop
 orjson
 
 # 2. Agent Frameworks
-# agentlightning built from source in Dockerfile for APO dashboard support
-google-adk                 # Google Agent Development Kit — A2A protocol runtime
-google-genai               # Google Generative AI SDK (used by ADK internally)
-aiofiles                   # Required by FastAPI StaticFiles for async dashboard serving
+google-genai
+google-adk
 
 # 3. LangGraph & LangChain (CopilotKit Remote Protocol)
 langgraph
 langchain-openai
 
-# 4. Observability (Crucial for the ACA OpenTelemetry setup)
+# 4. Observability
 opentelemetry-api
 opentelemetry-sdk
 opentelemetry-instrumentation-fastapi
-azure-monitor-opentelemetry # To route Python traces directly to App Insights
+azure-monitor-opentelemetry
 
 # 5. Agent UI Integration
 copilotkit
-langchain # Standard protocol support for agent interaction
+langchain
 
-# 6. Asynchronous Messaging & Auth (Enterprise Decoupling)
-azure-servicebus # For long-running Agent Lightning APO task pulling
-azure-identity   # For passwordless Azure OpenAI & Azure Service Bus auth
+# 6. Asynchronous Messaging & Auth
+azure-servicebus
+azure-identity
