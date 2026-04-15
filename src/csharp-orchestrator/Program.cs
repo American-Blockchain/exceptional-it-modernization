@@ -117,16 +117,19 @@ builder.Services.AddReverseProxy()
         {
             if (context.ProxyResponse != null && (int)context.ProxyResponse.StatusCode >= 300 && (int)context.ProxyResponse.StatusCode < 400)
             {
-                var location = context.HttpContext.Response.Headers.Location.ToString();
-                var internalHost = "ca-python-specialist.internal.ashytree-d52b6189.eastus.azurecontainerapps.io";
-                var publicHost = context.HttpContext.Request.Host.Value;
-
-                if (!string.IsNullOrEmpty(location) && location.Contains(internalHost))
+                if (context.HttpContext.Response.Headers.TryGetValue("Location", out var locationValues))
                 {
-                    context.HttpContext.Response.Headers.Location = location.Replace(internalHost, publicHost);
+                    var location = locationValues.ToString();
+                    var internalHost = "ca-python-specialist.internal.ashytree-d52b6189.eastus.azurecontainerapps.io";
+                    var publicHost = context.HttpContext.Request.Host.Value;
+
+                    if (!string.IsNullOrEmpty(location) && location.Contains(internalHost))
+                    {
+                        context.HttpContext.Response.Headers["Location"] = location.Replace(internalHost, publicHost);
+                    }
                 }
             }
-            return default;
+            return ValueTask.CompletedTask;
         });
     });
 
