@@ -89,10 +89,10 @@ builder.Services.AddReverseProxy()
                 
                 Transforms = new[]
                 {
-                    // 1. Force the Host header for the internal downstream request
+                    // 1. Force the Host header for internal routing
                     new Dictionary<string, string> { { "RequestHeader", "Host" }, { "Set", "ca-python-specialist.internal.ashytree-d52b6189.eastus.azurecontainerapps.io" } },
                     
-                    // 2. Enable standard X-Forwarded headers (Proto, Host)
+                    // 2. Pass along the original protocol and host
                     new Dictionary<string, string> { { "X-Forwarded", "Proto,Host" }, { "Append", "true" } }
                 }
             }
@@ -108,7 +108,26 @@ builder.Services.AddReverseProxy()
                 }
             }
         }
-    );
+    )
+    .AddTransforms(builder =>
+    {
+        // SURGICAL FIX: Mask Internal Redirects
+        builder.AddResponseTransform(context =>
+        {
+            if (context.ProxyResponse != null && (int)context.ProxyResponse.StatusCode >= 300 && (int)context.ProxyResponse.StatusCode < 400)
+            {
+                var location = context.HttpContext.Response.Headers.Location.ToString();
+                var internalHost = "ca-python-specialist.internal.ashytree-d52b6189.eastus.azurecontainerapps.io";
+                var publicHost = context.HttpContext.Request.Host.Value;
+
+                if (!string.IsNullOrEmpty(location) && location.Contains(internalHost))
+                {
+                    context.HttpContext.Response.Headers.Location = location.Replace(internalHost, publicHost);
+                }
+            }
+            return default;
+        });
+    });
 
 // --- 4. Request Pipeline & Health ---
 var app = builder.Build();
