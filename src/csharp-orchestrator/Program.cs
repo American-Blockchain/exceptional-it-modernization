@@ -89,15 +89,11 @@ builder.Services.AddReverseProxy()
                 
                 Transforms = new[]
                 {
-                    // 1. Force the Host header to be the internal FQDN for the downstream request
+                    // 1. Force the Host header for the internal downstream request
                     new Dictionary<string, string> { { "RequestHeader", "Host" }, { "Set", "ca-python-specialist.internal.ashytree-d52b6189.eastus.azurecontainerapps.io" } },
                     
-                    // 2. Preserve the original public Host in X-Forwarded-Host
-                    new Dictionary<string, string> { { "X-Forwarded", "Proto,Host" }, { "Append", "true" } },
-
-                    // 3. INTERNAL URL MASKING: Rewrite 301/302 Location headers
-                    // If the Python Agent redirects, point it back to the public Orchestrator
-                    new Dictionary<string, string> { { "ResponseHeader", "Location" }, { "HeaderAction", "Append" } }
+                    // 2. Enable standard X-Forwarded headers (Proto, Host)
+                    new Dictionary<string, string> { { "X-Forwarded", "Proto,Host" }, { "Append", "true" } }
                 }
             }
         },
