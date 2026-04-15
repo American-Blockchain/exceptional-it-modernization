@@ -12,6 +12,7 @@ Thumbs.db
 # AI Agent Context & Configurations
 .gemini/
 .antigravity/
+Gemini.MD
 
 
 # Terraform

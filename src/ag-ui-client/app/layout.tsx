@@ -19,8 +19,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${inter.className} bg-background text-foreground`}>
-        {/* Changed runtimeUrl to bypass Next.js API folder conflicts */}
-        <CopilotKit runtimeUrl="/agent-stream" agent="mas_orchestrator">
+        {/* Opaque server-side proxy — internal Azure VNet redirects never reach the browser */}
+        <CopilotKit runtimeUrl="/api/copilotkit" agent="mas_orchestrator">
           {children}
         </CopilotKit>
       </body>

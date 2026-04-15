@@ -159,7 +159,7 @@ async def lifespan(app: FastAPI):
     yield
     worker_task.cancel()
 
-app = FastAPI(lifespan=lifespan, default_response_class=ResilientORJSONResponse)
+app = FastAPI(lifespan=lifespan, default_response_class=ResilientORJSONResponse, redirect_slashes=False)
 FastAPIInstrumentor.instrument_app(app)
 
 # 1. Mount Agent Lightning Dashboard
