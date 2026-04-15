@@ -22,7 +22,8 @@ from azure.monitor.opentelemetry import configure_azure_monitor
 
 # Agent Lightning & ADK
 from agentlightning import LightningStore
-from google.adk.agents import LangGraphAgent as ADKLangGraphAgent
+from google.adk.agents import BaseAgent as ADKBaseAgent
+from google.adk.agents.invocation_context import InvocationContext
 
 # CopilotKit & LangGraph
 from copilotkit import CopilotKitRemoteEndpoint
@@ -96,13 +97,21 @@ workflow.add_edge("student", "teacher")
 workflow.add_edge("teacher", END)
 mas_graph = workflow.compile()
 
-# Google ADK Wrapper
-class MASAgent(ADKLangGraphAgent):
+# Google ADK Wrapper — correct BaseAgent subclass pattern
+class MASAgent(ADKBaseAgent):
+    """Wraps the compiled LangGraph MAS workflow as an ADK-compliant BaseAgent.
+    All execution telemetry is bound to Agent Lightning via store.trace()."""
+
     def __init__(self):
-        super().__init__(
-            name="mas_orchestrator",
-            graph=mas_graph
-        )
+        super().__init__(name="mas_orchestrator", description="Student/Teacher MAS APO agent")
+
+    async def _run_async_impl(self, ctx: InvocationContext):  # type: ignore[override]
+        input_text = ctx.user_content.parts[0].text if ctx.user_content and ctx.user_content.parts else ""
+        result = await mas_graph.ainvoke({"messages": [HumanMessage(content=input_text)]})
+        from google.adk.events import Event
+        from google.genai.types import Content, Part
+        final_text = result["messages"][-1].content if result.get("messages") else ""
+        yield Event(author=self.name, content=Content(parts=[Part(text=final_text)]))
 
 # ---------------------------------------------------------
 # A2A JSON-RPC Worker
