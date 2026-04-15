@@ -1,0 +1,54 @@
+{
+  "mcpServers": {
+    "azure": {
+      "command": "/usr/local/bin/npx",
+      "args": [
+        "-y",
+        "@azure/mcp@latest",
+        "server",
+        "start",
+        "--mode", "all"
+      ],
+      "env": {
+        "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin",
+        "AZURE_SUBSCRIPTION_ID": "30520530-588b-404a-bd21-408d4fe51889",
+        "AZURE_TENANT_ID": "11b428c1-54e2-482e-ba15-de2c5d9118bd"
+      }
+    },
+    "terraform": {
+      "command": "/usr/local/bin/npx",
+      "args": ["-y", "@modelcontextprotocol/server-terraform"],
+      "env": {
+        "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin"
+      }
+    },
+    "kubernetes": {
+      "command": "/usr/local/bin/npx",
+      "args": ["-y", "@modelcontextprotocol/server-kubernetes"],
+      "env": {
+        "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin"
+      }
+    },
+    "helm": {
+      "command": "/usr/local/bin/npx",
+      "args": ["-y", "@modelcontextprotocol/server-helm"],
+      "env": {
+        "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin"
+      }
+    },
+    "docker-filesystem": {
+      "command": "/usr/local/bin/npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "./"],
+      "env": {
+        "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin"
+      }
+    },
+    "chrome-devtools": {
+      "command": "/usr/local/bin/npx",
+      "args": ["-y", "chrome-devtools-mcp"],
+      "env": {
+        "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin"
+      }
+    }
+  }
+}

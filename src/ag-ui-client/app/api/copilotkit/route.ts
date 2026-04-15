@@ -24,21 +24,19 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const upstream = await fetch(`${gatewayUrl}/copilotkit`, {
+    const response = await fetch(`${gatewayUrl}/copilotkit`, {
       method: 'POST',
       headers: {
         'Content-Type': req.headers.get('Content-Type') || 'application/json',
       },
       body: await req.text(),
-      // Node.js fetch follows 30x redirects automatically and internally —
-      // the browser never sees the internal Azure VNet address.
     });
 
     // Stream the SSE response body directly back to the CopilotKit client
-    return new Response(upstream.body, {
-      status: upstream.status,
+    return new Response(response.body, {
+      status: response.status,
       headers: {
-        'Content-Type': upstream.headers.get('Content-Type') || 'text/event-stream',
+        'Content-Type': response.headers.get('Content-Type') || 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
       },
