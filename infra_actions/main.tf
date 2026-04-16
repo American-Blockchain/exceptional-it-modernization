@@ -243,13 +243,13 @@ resource "azurerm_servicebus_queue" "apo_tasks" {
 # --- RBAC: Grant C# Orchestrator Sender Rights ---
 resource "azurerm_role_assignment" "csharp_sb_sender" {
   principal_id         = azurerm_user_assigned_identity.ca_acr_pull_identity.principal_id
-  role_definition_name = "Azure Service Bus Data Sender"
+  role_definition_name = "Azure Service Bus Data Sender" # Consider a dedicated identity for Service Bus roles for clearer separation of concerns.
   scope                = azurerm_servicebus_namespace.mas_bus.id
 }
 
 # --- RBAC: Grant Python Specialist Receiver Rights ---
 resource "azurerm_role_assignment" "python_sb_receiver" {
   principal_id         = azurerm_user_assigned_identity.ca_acr_pull_identity.principal_id
-  role_definition_name = "Azure Service Bus Data Receiver"
+  role_definition_name = "Azure Service Bus Data Receiver" # Consider a dedicated identity for Service Bus roles for clearer separation of concerns.
   scope                = azurerm_servicebus_namespace.mas_bus.id
 }

@@ -113,6 +113,14 @@ class MASAgent(ADKBaseAgent):
         final_text = result["messages"][-1].content if result.get("messages") else ""
         yield Event(author=self.name, content=Content(parts=[Part(text=final_text)]))
 
+    def dict_repr(self):
+        """Elite DevOps: Compatibility for CopilotKit info endpoint."""
+        return {
+            "name": self.name,
+            "description": self.description,
+            "parameters": []
+        }
+
 # ---------------------------------------------------------
 # A2A JSON-RPC Worker
 # ---------------------------------------------------------
@@ -129,6 +137,7 @@ async def servicebus_worker():
                 messages = await receiver.receive_messages(max_message_count=5, max_wait_time=5)
                 for msg in messages:
                     try:
+                        logger.info(f"[Elite-DevOps] Received message from Service Bus. Body length: {len(str(msg))}")
                         payload_dict = json.loads(str(msg))
                         
                         # Validate JSON-RPC 2.0 A2A Envelope
@@ -142,17 +151,18 @@ async def servicebus_worker():
                             extracted_context = TraceContextTextMapPropagator().extract(carrier={"traceparent": diagnostic_id})
 
                             with tracer.start_as_current_span("adk_process_a2a_task", context=extracted_context) as span:
-                                # Agent Lightning APO Loop Binding
-                                with store.trace(task_id=task_id) as agent_trace:
-                                    agent_trace.record_state("agent_mission", "A2A Task Execution")
-                                    
-                                    # ADK Execution
+                                logger.info(f"[Elite-Tracing-Final-Attempt] Processing task {task_id}")
+                                try:
+                                    # Attempting trace session
+                                    with store.trace(task_id=task_id) as agent_trace:
+                                        agent_trace.record_state("agent_mission", "A2A Task Execution")
+                                        result = await adk_agent.ainvoke({"messages": [HumanMessage(content=raw_input)]})
+                                        agent_trace.record_state("final_result", str(result))
+                                        store.emit_reward(1.0)
+                                except (AttributeError, TypeError) as tracing_error:
+                                    logger.warning(f"[!] Tracing failed or unsupported: {tracing_error}. Executing ADK standalone.")
                                     result = await adk_agent.ainvoke({"messages": [HumanMessage(content=raw_input)]})
-                                    
-                                    agent_trace.record_state("final_result", str(result))
-                                    
-                                    # Emit objective reward for Agent Lightning APO
-                                    store.emit_reward(1.0) 
+                                    store.emit_reward(1.0)
 
                         await receiver.complete_message(msg)
                     except Exception as e:
@@ -169,12 +179,26 @@ async def lifespan(app: FastAPI):
     worker_task.cancel()
 
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.datastructures import URL
 from fastapi.staticfiles import StaticFiles
+
+class RelativeRedirectMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        if 300 <= response.status_code < 400 and "location" in response.headers:
+            location = response.headers["location"]
+            parsed_url = URL(location)
+            # If the location is absolute, strip the scheme and netloc to make it relative
+            if parsed_url.scheme and parsed_url.netloc:
+                response.headers["location"] = str(parsed_url.replace(scheme="", netloc=""))
+        return response
 
 app = FastAPI(lifespan=lifespan, default_response_class=ResilientORJSONResponse, redirect_slashes=False)
 
 # Support X-Forwarded-Host/Proto from the C# Orchestrator gateway
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+app.add_middleware(RelativeRedirectMiddleware)
 
 FastAPIInstrumentor.instrument_app(app)
 

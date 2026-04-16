@@ -7,6 +7,7 @@ using OpenTelemetry.Trace;
 using Azure.Identity;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Yarp.ReverseProxy.Configuration;
+using Yarp.ReverseProxy.Transforms;
 using Azure.Messaging.ServiceBus;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -47,7 +48,15 @@ if (string.IsNullOrWhiteSpace(servicebusFqdn))
 }
 
 // Register the ServiceBusClient cleanly for DI using passwordless Identity
-builder.Services.AddSingleton(new ServiceBusClient(servicebusFqdn, new DefaultAzureCredential()));
+// Elite DevOps: Specifying the ClientId to prevent ambiguity in dual-identity environments
+var credentialOptions = new DefaultAzureCredentialOptions();
+var managedIdentityClientId = "0fd15bdb-be06-40a2-9dd8-059bfb0d239c"; // Orchestrator User-Assigned Identity
+if (!string.IsNullOrEmpty(managedIdentityClientId))
+{
+    credentialOptions.ManagedIdentityClientId = managedIdentityClientId;
+}
+
+builder.Services.AddSingleton(new ServiceBusClient(servicebusFqdn, new DefaultAzureCredential(credentialOptions)));
 builder.Services.AddTransient<GoogleAgentPlugin>();
 
 // --- 3. Semantic Kernel Orchestration Layer ---
@@ -76,25 +85,16 @@ builder.Services.AddKeyedScoped<Kernel>("AgentKernel", (sp, key) =>
     return kernelBuilder.Build();
 });
 
-// --- NEW: YARP Reverse Proxy Configuration ---
+// --- NEW: YARP Reverse Proxy Configuration (Dapr Primary + VNet Fallback) ---
 builder.Services.AddReverseProxy()
     .LoadFromMemory(
         routes: new[]
         {
             new RouteConfig()
             {
-                RouteId = "copilotkit-stream",
+                RouteId = "copilotkit-route",
                 ClusterId = "python-specialist-cluster",
-                Match = new RouteMatch { Path = "/copilotkit/{**catch-all}" },
-                
-                Transforms = new[]
-                {
-                    // 1. Force the Host header for internal routing
-                    new Dictionary<string, string> { { "RequestHeader", "Host" }, { "Set", "ca-python-specialist.internal.ashytree-d52b6189.eastus.azurecontainerapps.io" } },
-                    
-                    // 2. Pass along the original protocol and host
-                    new Dictionary<string, string> { { "X-Forwarded", "Proto,Host" }, { "Append", "true" } }
-                }
+                Match = new RouteMatch { Path = "/copilotkit/{**catch-all}" }
             }
         },
         clusters: new[]
@@ -102,35 +102,23 @@ builder.Services.AddReverseProxy()
             new ClusterConfig()
             {
                 ClusterId = "python-specialist-cluster",
-                HttpClient = new HttpClientConfig { DangerousAcceptAnyServerCertificate = true, FollowRedirects = true },
+                // Elite DevOps: Trust the internal VNet certificates
+                HttpClient = new HttpClientConfig { DangerousAcceptAnyServerCertificate = true },
                 Destinations = new Dictionary<string, DestinationConfig>(StringComparer.OrdinalIgnoreCase)
                 {
-                    { "python-backend", new DestinationConfig() { Address = pythonAgentUrl } }
+                    // Primary: Dapr Sidecar Invocation
+                    { "dapr-primary", new DestinationConfig() { Address = "http://localhost:3500/v1.0/invoke/python-specialist/method/" } },
+                    
+                    // Fallback: Direct VNet FQDN (User Requested)
+                    { "vnet-fallback", new DestinationConfig() { Address = pythonAgentUrl.EndsWith("/") ? pythonAgentUrl : pythonAgentUrl + "/" } }
                 }
             }
         }
     )
-    .AddTransforms(builder =>
+    .ConfigureHttpClient((context, handler) =>
     {
-        // SURGICAL FIX: Mask Internal Redirects
-        builder.AddResponseTransform(context =>
-        {
-            if (context.ProxyResponse != null && (int)context.ProxyResponse.StatusCode >= 300 && (int)context.ProxyResponse.StatusCode < 400)
-            {
-                if (context.HttpContext.Response.Headers.TryGetValue("Location", out var locationValues))
-                {
-                    var location = locationValues.ToString();
-                    var internalHost = "ca-python-specialist.internal.ashytree-d52b6189.eastus.azurecontainerapps.io";
-                    var publicHost = context.HttpContext.Request.Host.Value;
-
-                    if (!string.IsNullOrEmpty(location) && location.Contains(internalHost))
-                    {
-                        context.HttpContext.Response.Headers["Location"] = location.Replace(internalHost, publicHost);
-                    }
-                }
-            }
-            return ValueTask.CompletedTask;
-        });
+        // SURGICAL FIX: Enable server-side redirect following to mask internal FQDNs from the browser
+        handler.AllowAutoRedirect = true;
     });
 
 // --- 4. Request Pipeline & Health ---
@@ -144,5 +132,22 @@ app.MapGet("/", () => Results.Ok(new {
     Component = "Semantic Kernel Orchestrator", 
     TargetSpecialist = pythonAgentUrl 
 }));
+
+// --- ELITE DEVOPS: MAS APO Test Trigger ---
+app.MapPost("/api/test/orchestrate", async (GoogleAgentPlugin plugin) =>
+{
+    var testTraceId = $"TEST-APO-{Guid.NewGuid().ToString("N")[..8]}";
+    var intent = "Standardize this executive summary to align with American Blockchain branding guidelines.";
+    var input = "American Blockchain (ABC) is a leader in blockchain modernization for the public sector. We focus on transparency and high-fidelity ledger systems.";
+    
+    var result = await plugin.ExecuteSpecialistTaskAsync(intent, input);
+    
+    return Results.Ok(new 
+    { 
+        Message = "APO Test Task Successfully Triggered",
+        TraceId = testTraceId,
+        PluginResponse = result
+    });
+});
 
 app.Run();
