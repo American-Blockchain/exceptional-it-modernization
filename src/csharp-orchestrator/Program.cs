@@ -85,7 +85,7 @@ builder.Services.AddKeyedScoped<Kernel>("AgentKernel", (sp, key) =>
     return kernelBuilder.Build();
 });
 
-// --- NEW: YARP Reverse Proxy Configuration (Dapr Primary + VNet Fallback) ---
+// --- NEW: YARP Reverse Proxy Configuration (VNet Direct — Dapr not enabled) ---
 builder.Services.AddReverseProxy()
     .LoadFromMemory(
         routes: new[]
@@ -94,7 +94,14 @@ builder.Services.AddReverseProxy()
             {
                 RouteId = "copilotkit-route",
                 ClusterId = "python-specialist-cluster",
-                Match = new RouteMatch { Path = "/copilotkit/{**catch-all}" }
+                Match = new RouteMatch { Path = "/copilotkit/{**catch-all}" },
+                Transforms = new[]
+                {
+                    // Do NOT forward the Vercel/Orchestrator host header to FastAPI.
+                    // CopilotKit agent discovery compares the Host header to its own
+                    // registered base URL — a mismatch returns empty agents: [].
+                    new Dictionary<string, string> { { "RequestHeaderOriginalHost", "false" } }
+                }
             }
         },
         clusters: new[]
@@ -106,18 +113,16 @@ builder.Services.AddReverseProxy()
                 HttpClient = new HttpClientConfig { DangerousAcceptAnyServerCertificate = true },
                 Destinations = new Dictionary<string, DestinationConfig>(StringComparer.OrdinalIgnoreCase)
                 {
-                    // Primary: Dapr Sidecar Invocation
-                    { "dapr-primary", new DestinationConfig() { Address = "http://localhost:3500/v1.0/invoke/python-specialist/method/" } },
-                    
-                    // Fallback: Direct VNet FQDN (User Requested)
-                    { "vnet-fallback", new DestinationConfig() { Address = pythonAgentUrl.EndsWith("/") ? pythonAgentUrl : pythonAgentUrl + "/" } }
+                    // Direct VNet FQDN — sole authoritative destination
+                    // (Dapr sidecar not enabled in this ACA environment)
+                    { "vnet-primary", new DestinationConfig() { Address = pythonAgentUrl.EndsWith("/") ? pythonAgentUrl : pythonAgentUrl + "/" } }
                 }
             }
         }
     )
     .ConfigureHttpClient((context, handler) =>
     {
-        // SURGICAL FIX: Enable server-side redirect following to mask internal FQDNs from the browser
+        // Enable server-side redirect following to mask internal FQDNs from the browser
         handler.AllowAutoRedirect = true;
     });
 

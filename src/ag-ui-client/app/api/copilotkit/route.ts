@@ -3,61 +3,74 @@ import { NextRequest } from 'next/server';
 /**
  * Opaque Server-Side CopilotKit Proxy
  *
- * Why this exists:
- * next.config.mjs rewrites are transparent — when YARP forwards FastAPI's
- * internal 301/307 redirect, Next.js passes it straight through to the browser.
- * The browser then attempts to resolve the internal Azure VNet FQDN
- * (ca-python-specialist.internal.*), which is unreachable and causes a
- * fatal CORS block + net::ERR_FAILED.
+ * Architecture:
+ *   Browser → Vercel /api/copilotkit [this file]
+ *           → C# Orchestrator /copilotkit/ (GATEWAY_URL)
+ *           → YARP → Python Specialist /copilotkit/
  *
- * This route runs on the Vercel Node.js server. All redirects are
- * consumed server-side. The browser only ever sees a clean 200 + SSE stream.
+ * GATEWAY_URL must point at the C# Orchestrator public FQDN.
+ * YARP on the C# side handles routing /copilotkit/** → Python Specialist.
+ *
+ * All redirects are consumed server-side. The browser only ever sees a
+ * clean 200 + SSE stream — internal Azure VNet FQDNs never leak.
  */
-export async function POST(req: NextRequest) {
-  let gatewayUrl = process.env.PYTHON_AGENT_URL;
-  
-  if (!gatewayUrl) {
-    return new Response(
-      JSON.stringify({ error: 'PYTHON_AGENT_URL environment variable is not set.' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
 
-  // Normalize URL: Ensure protocol is present to avoid fetch parsing errors
-  if (!gatewayUrl.startsWith('http://') && !gatewayUrl.startsWith('https://')) {
-    gatewayUrl = `https://${gatewayUrl}`;
-  }
+// The C# Orchestrator is the single public gateway. Its YARP config routes
+// /copilotkit/** to the Python Specialist internally over the ACA VNet.
+const GATEWAY_URL =
+  process.env.GATEWAY_URL ||
+  process.env.PYTHON_AGENT_URL ||
+  'https://ca-csharp-orchestrator.ashytree-d52b6189.eastus.azurecontainerapps.io';
+
+export async function POST(req: NextRequest) {
+  const base = GATEWAY_URL.replace(/\/$/, '');
+
+  // The C# YARP route is mounted at /copilotkit — append trailing slash
+  // to prevent FastAPI from issuing a 307 redirect.
+  const targetUrl = `${base}/copilotkit/`;
+
+  console.log('[CopilotKit Proxy] Forwarding to:', targetUrl);
 
   try {
-    // Append trailing slash to avoid internal FastAPI redirects
-    const targetUrl = `${gatewayUrl}${gatewayUrl.endsWith('/') ? '' : '/'}copilotkit/`;
-    
+    const bodyText = await req.text();
+
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
         'Content-Type': req.headers.get('Content-Type') || 'application/json',
+        // Forward the CopilotKit thread/run headers if present
+        ...(req.headers.get('x-copilotkit-runtime-url') && {
+          'x-copilotkit-runtime-url': req.headers.get('x-copilotkit-runtime-url')!,
+        }),
       },
-      body: await req.text(),
-      redirect: 'manual', // We handle redirects manually to prevent internal URL leakage
+      body: bodyText,
+      // Follow redirects server-side — the C# YARP may issue a 301 from
+      // Dapr primary → VNet fallback. We consume it here, never the browser.
+      redirect: 'follow',
     });
 
-    // If the upstream tries to redirect us to an internal URL, we stop it here
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('Location');
-      console.warn('[CopilotKit Proxy] Blocked internal redirect to:', location);
+    const contentType = response.headers.get('Content-Type') || '';
+
+    // Log non-200 responses for diagnostics
+    if (!response.ok) {
+      const body = await response.text();
+      console.error(
+        `[CopilotKit Proxy] Upstream error ${response.status}:`,
+        body.slice(0, 500)
+      );
       return new Response(
-        JSON.stringify({ error: 'Upstream redirected to internal URL.', location }),
-        { status: 502, headers: { 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'MAS Gateway returned an error.', status: response.status, detail: body.slice(0, 500) }),
+        { status: response.status, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Stream the SSE response body directly back to the CopilotKit client
+    // Stream SSE or return JSON — preserve whatever the upstream sends
     return new Response(response.body, {
       status: response.status,
       headers: {
-        'Content-Type': response.headers.get('Content-Type') || 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
+        'Content-Type': contentType || 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'X-Accel-Buffering': 'no', // Disable Nginx/Vercel edge buffering for SSE
       },
     });
   } catch (error: unknown) {
