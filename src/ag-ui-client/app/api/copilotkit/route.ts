@@ -22,36 +22,36 @@ const GATEWAY_URL =
   process.env.PYTHON_AGENT_URL ||
   'https://ca-csharp-orchestrator.ashytree-d52b6189.eastus.azurecontainerapps.io';
 
-export async function POST(req: NextRequest) {
+async function handleProxyRequest(req: NextRequest, isGet: boolean = false) {
   const base = GATEWAY_URL.replace(/\/$/, '');
 
-  // The C# YARP route is mounted at /copilotkit — append trailing slash
-  // to prevent FastAPI from issuing a 307 redirect.
-  const targetUrl = `${base}/copilotkit/`;
+  // Extract any sub-path (like /info) if present. 
+  // req.nextUrl.pathname is /api/copilotkit or /api/copilotkit/info
+  const subPath = req.nextUrl.pathname.replace('/api/copilotkit', '');
+  const targetUrl = `${base}/copilotkit${subPath}`;
 
-  console.log('[CopilotKit Proxy] Forwarding to:', targetUrl);
+  console.log(`[CopilotKit Proxy] ${req.method} Forwarding to:`, targetUrl);
 
   try {
-    const bodyText = await req.text();
-
-    const response = await fetch(targetUrl, {
-      method: 'POST',
+    const fetchOptions: RequestInit = {
+      method: req.method,
       headers: {
         'Content-Type': req.headers.get('Content-Type') || 'application/json',
-        // Forward the CopilotKit thread/run headers if present
         ...(req.headers.get('x-copilotkit-runtime-url') && {
           'x-copilotkit-runtime-url': req.headers.get('x-copilotkit-runtime-url')!,
         }),
       },
-      body: bodyText,
-      // Follow redirects server-side — the C# YARP may issue a 301 from
-      // Dapr primary → VNet fallback. We consume it here, never the browser.
       redirect: 'follow',
-    });
+    };
+
+    if (!isGet) {
+      fetchOptions.body = await req.text();
+    }
+
+    const response = await fetch(targetUrl, fetchOptions);
 
     const contentType = response.headers.get('Content-Type') || '';
 
-    // Log non-200 responses for diagnostics
     if (!response.ok) {
       const body = await response.text();
       console.error(
@@ -64,13 +64,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Stream SSE or return JSON — preserve whatever the upstream sends
     return new Response(response.body, {
       status: response.status,
       headers: {
         'Content-Type': contentType || 'text/event-stream',
         'Cache-Control': 'no-cache, no-transform',
-        'X-Accel-Buffering': 'no', // Disable Nginx/Vercel edge buffering for SSE
+        'X-Accel-Buffering': 'no',
       },
     });
   } catch (error: unknown) {
@@ -81,4 +80,12 @@ export async function POST(req: NextRequest) {
       { status: 502, headers: { 'Content-Type': 'application/json' } }
     );
   }
+}
+
+export async function POST(req: NextRequest) {
+  return handleProxyRequest(req, false);
+}
+
+export async function GET(req: NextRequest) {
+  return handleProxyRequest(req, true);
 }
