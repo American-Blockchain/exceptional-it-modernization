@@ -90,23 +90,43 @@ jobs:
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      # Ensure these match your existing defaults or vars
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-terraform-state' }}
+      CA_CSHARP_NAME: ${{ vars.CA_CSHARP_NAME || 'ca-csharp-orchestrator' }}
     
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # 1. ADD THIS: Authenticate to Azure so we can query the live infrastructure
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # 2. ADD THIS: Dynamically fetch the actual FQDN and inject it into the pipeline
+      - name: Get Live C# Orchestrator URL
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            FQDN=$(az containerapp show --name ${{ env.CA_CSHARP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --query properties.configuration.ingress.fqdn -o tsv)
+            echo "PYTHON_AGENT_URL=https://$FQDN" >> $GITHUB_ENV
+            # Also inject GATEWAY_URL since route.ts checks it
+            echo "GATEWAY_URL=https://$FQDN" >> $GITHUB_ENV
+            echo "Successfully retrieved live MAS Gateway: https://$FQDN"
+
       - name: Install pnpm & Vercel CLI
         run: npm install -g pnpm vercel@latest
 
       - name: Pull Vercel Environment
-        # Running from repo root. Vercel automatically maps to src/ag-ui-client.
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
           
       - name: Build Project Artifacts
+        # The Vercel CLI will automatically consume the PYTHON_AGENT_URL from $GITHUB_ENV
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          # Injects the C# Gateway URL explicitly during the Next.js build
-          PYTHON_AGENT_URL: "https://${{ env.CA_CSHARP_NAME }}.ashytree-d52b6189.eastus.azurecontainerapps.io"
 
       - name: Deploy Project Artifacts to Vercel
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
